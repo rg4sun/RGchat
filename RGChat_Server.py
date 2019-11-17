@@ -15,7 +15,7 @@ MAX_BYTES = 65535
 # userData = [{'id':0,'name':'RGroot','pwd':'Rg123','host':None}] # 预先存入一个root用户，事实上是为了普通用户id从1计数
 # 保存用户数据，之后把这个改成数据库或者导出txt
 
-# 链接数据库
+# 链接数据库---这里要改成登录
 print('=========================================')
 print('Connecting Database...')
 mydb = dbConnector.connect(
@@ -158,8 +158,8 @@ def serverBoot(interface,port):
             continue
         elif status.decode() == statusMark['logout']:
             handleLogout(sock,addr)
-            break # 测试用
-            # continue
+            # break # 测试用
+            continue
         elif status.decode() == statusMark['userDel']:
             handleUserDel(sock,addr)
             # break # 测试用

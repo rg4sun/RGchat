@@ -33,6 +33,9 @@ def greeting(sock):
     serverGreet = sock.recv(MAX_BYTES)
     print(serverGreet.decode())
     print('===================================================')
+    username = input('Welcome to RGchat!\nPlease enter user name: ')
+    return username
+
 
 def register(sock):
 
@@ -194,11 +197,12 @@ def clientBoot(host,port):
     # sock.connect((host,port))
     sock.connect((host,port))
     # 问候服务器
-    greeting(sock)
+    username = greeting(sock)
     # register(sock)
     # userDel('jack',sock)
     # login('Lucy',sock)
-    logout('test',sock)
+    # logout('test',sock)
+    login(username,sock)
     
 
 
