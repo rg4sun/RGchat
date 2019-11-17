@@ -6,7 +6,7 @@ import threading
 # 设置状态码字典，服务器根据客户端发送的状态码进行响应，
 # 为了能使得服务器能区分客户端的不同请求，客户端每次发消息前必须发送一个状态码
 # 然后服务器根据状态码来决定采用什么功能响应
-statusMark = {'greet':'0', 'login':'1', 'register':'2', 'logout':'3'} 
+statusMark = {'greet':'0', 'login':'1', 'register':'2', 'logout':'3', 'userDel':'4'} 
 MAX_BYTES = 65535
 
 # def info_tuple2List(infoTuple): # 数据库查询返回的一条记录是元组，为了方便后续编程，设计此函数
@@ -82,12 +82,16 @@ def register(sock):
     return username
 
 def userDel(username,sock): # 一般这个模块是用户登录之后才出现，所以删除用户的时候不用查用户是否存在
+    # 先发送状态码
+    sock.send(statusMark['userDel'].encode())
     print('=========================================')
     print('敏感操作：正在删除账户 {} ...'.format(username))
-    sql = 'SELECT pwd FROM userdata WHERE name="{}" '.format(username)
-    dbCursor.execute(sql)
-    # pwd = dbCursor.fetchall()[0][0] # fetchall 结果应该是[(pwd,)]
-    pwd = dbCursor.fetchone()[0] # fetchone 结果应该是 (pwd,)
+    sock.send(username.encode()) # 将要删的username发送给服务器
+    # sql = 'SELECT pwd FROM userdata WHERE name="{}" '.format(username)
+    # dbCursor.execute(sql)
+    # # pwd = dbCursor.fetchall()[0][0] # fetchall 结果应该是[(pwd,)]
+    # pwd = dbCursor.fetchone()[0] # fetchone 结果应该是 (pwd,)
+    pwd = sock.recv(MAX_BYTES).decode() # 接收密码，用于检验
     errPwdCount=0
     while(1):
         pwdCheck = getpass.getpass('Password: ')
@@ -96,12 +100,17 @@ def userDel(username,sock): # 一般这个模块是用户登录之后才出现�
             print('密码输入错误，还有{}次机会！'.format(3-errPwdCount))
             if errPwdCount>2:
                 print('您已经输错3次密码，系统将自动退出！')
+                pwdFlag = '0'
+                sock.send(pwdFlag.encode()) # 发送密码检验标志符
                 return
         else:
-            sql = 'DELETE FROM userdata WHERE name="{}" '.format(username)
-            dbCursor.execute(sql)
-            mydb.commit() # 只要数据表有变动就要commit
+            pwdFlag = '1'
+            sock.send(pwdFlag.encode()) # 发送密码检验标志符
+            # sql = 'DELETE FROM userdata WHERE name="{}" '.format(username)
+            # dbCursor.execute(sql)
+            # mydb.commit() # 只要数据表有变动就要commit
             print('账户已被成功删除！')
+            print('=========================================')
             return
     
 # def login(username,sock): # host没写
@@ -164,7 +173,8 @@ def clientBoot(host,port):
     sock.connect((host,port))
     # 问候服务器
     greeting(sock)
-    register(sock)
+    # register(sock)
+    userDel('jack',sock)
     
 
 

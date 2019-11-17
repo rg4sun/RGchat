@@ -8,7 +8,7 @@ import json
 # 设置状态码字典，服务器根据客户端发送的状态码进行响应，
 # 为了能使得服务器能区分客户端的不同请求，客户端每次发消息前必须发送一个状态码
 # 然后服务器根据状态码来决定采用什么功能响应
-statusMark = {'greet':0, 'login':1, 'register':2, 'logout':3} 
+statusMark = {'greet':'0', 'login':'1', 'register':'2', 'logout':'3', 'userDel':'4'} 
 MAX_BYTES = 65535
 
 # userinfo ={'id':None,'name':None,'pwd':None,'host':None,'status':None} # id字段用于记录用户序号，用于检索userDate
@@ -78,28 +78,29 @@ def handleRegister(sock,addr):
     # print('=========================================')
     # return username
 
-def userDel(username,sock): # 一般这个模块是用户登录之后才出现，所以删除用户的时候不用查用户是否存在
-    print('=========================================')
-    print('敏感操作：正在删除账户 {} ...'.format(username))
+def handleUserDel(sock,addr): # 一般这个模块是用户登录之后才出现，所以删除用户的时候不用查用户是否存在
+    # print('=========================================')
+    # print('敏感操作：正在删除账户 {} ...'.format(username))
+    # username = sock.recvfrom(MAX_BYTES)# 从客户端接收要删除的username, 要时刻注意recvform返回的是 data-str，addr-tuple
+    # username = username.decode
+    username = sock.recv(MAX_BYTES).decode()
+    # 拉取对应于该user的pwd
     sql = 'SELECT pwd FROM userdata WHERE name="{}" '.format(username)
     dbCursor.execute(sql)
     # pwd = dbCursor.fetchall()[0][0] # fetchall 结果应该是[(pwd,)]
     pwd = dbCursor.fetchone()[0] # fetchone 结果应该是 (pwd,)
-    errPwdCount=0
-    while(1):
-        pwdCheck = getpass.getpass('Password: ')
-        if pwd != pwdCheck:
-            errPwdCount+=1
-            print('密码输入错误，还有{}次机会！'.format(3-errPwdCount))
-            if errPwdCount>2:
-                print('您已经输错3次密码，系统将自动退出！')
-                return
-        else:
-            sql = 'DELETE FROM userdata WHERE name="{}" '.format(username)
-            dbCursor.execute(sql)
-            mydb.commit() # 只要数据表有变动就要commit
-            print('账户已被成功删除！')
-            return
+    sock.sendto(pwd.encode(),addr) # 将密码发送给客户端用于验证，后续优化这里要加密
+    # pwdFlag = sock.recvfrom(MAX_BYTES) #  要时刻注意recvform返回的是 data-str，addr-tuple
+    # pwdFlag = pwdFlag.decode()
+    pwdFlag = sock.recv(MAX_BYTES).decode()
+    if pwdFlag == '0':
+        return
+    elif pwdFlag == '1':
+        sql = 'DELETE FROM userdata WHERE name="{}" '.format(username)
+        dbCursor.execute(sql)
+        mydb.commit() # 只要数据表有变动就要commit
+        return
+
     
 def login(username,sock): # host没写
 
@@ -162,15 +163,19 @@ def serverBoot(interface,port):
 
     while True:
         status, addr = sock.recvfrom(MAX_BYTES)
-        if status.decode() == '0':
+        if status.decode() == statusMark['greet']:
             handleGreeting(sock,addr)
             # break # 测试用
             continue
-        elif status.decode() == '1':
+        elif status.decode() == statusMark['login']:
             pass
             # handleLogin(sock,addr)
-        elif status.decode() == '2':
+        elif status.decode() == statusMark['register']:
             handleRegister(sock,addr)
+            # break # 测试用
+            continue
+        elif status.decode() == statusMark['userDel']:
+            handleUserDel(sock,addr)
             break # 测试用
             # continue
         
