@@ -120,12 +120,12 @@ def handleLogin(sock,addr): # host没写
             sock.sendto(userinfo.encode(),addr) # 发送更新状态的用户信息
             return
 
-def logout(username,sock): # 没写完，要等进入mainframe写完之后调用break
+def handleLogout(sock, addr): # 没写完，要等进入mainframe写完之后调用break
+    username = sock.recv(MAX_BYTES).decode() # 接收要退出的账户名
     # 注销后将该用户状态设置为0表示离线，同时清空host
     sql = 'UPDATE userdata SET status={},host=Null WHERE name="{}" '.format(0,username)
     dbCursor.execute(sql)
     mydb.commit()
-    print('Goodbye~ {} '.format(username))
     pass
 
 def privChat(pair):
@@ -156,6 +156,10 @@ def serverBoot(interface,port):
             handleRegister(sock,addr)
             # break # 测试用
             continue
+        elif status.decode() == statusMark['logout']:
+            handleLogout(sock,addr)
+            break # 测试用
+            # continue
         elif status.decode() == statusMark['userDel']:
             handleUserDel(sock,addr)
             # break # 测试用

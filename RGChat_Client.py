@@ -165,13 +165,20 @@ def login(username,sock): # host没写
         print('=========================================')
         mainFrame(userinfo)
 
-# def logout(username,sock): # 没写完，要等进入mainframe写完之后调用break
-#     # 注销后将该用户状态设置为0表示离线，同时清空host
-#     sql = 'UPDATE userdata SET status={},host=Null WHERE name="{}" '.format(0,username)
-#     dbCursor.execute(sql)
-#     mydb.commit()
-#     print('Goodbye~ {} '.format(username))
-#     pass
+# 一般这个模块是用户登录之后才出现，所以删除用户的时候不用查用户是否存在
+def logout(username,sock): # 没写完，要等进入mainframe写完之后调用break
+    # 先发送状态码
+    sock.send(statusMark['logout'].encode())
+    sock.send(username.encode()) # 发送要退出的账户名
+    print('=========================================')
+    print('正在退出账户...')
+    # # 注销后将该用户状态设置为0表示离线，同时清空host
+    # sql = 'UPDATE userdata SET status={},host=Null WHERE name="{}" '.format(0,username)
+    # dbCursor.execute(sql)
+    # mydb.commit()
+    print('Goodbye~ {} '.format(username))
+    print('=========================================')
+    pass
 
 def privChat(pair):
     pass
@@ -190,7 +197,8 @@ def clientBoot(host,port):
     greeting(sock)
     # register(sock)
     # userDel('jack',sock)
-    login('Lucy',sock)
+    # login('Lucy',sock)
+    logout('test',sock)
     
 
 
