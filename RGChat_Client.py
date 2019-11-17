@@ -15,8 +15,8 @@ MAX_BYTES = 65535
 # 'tuple' object is not callable
 # 傻了。。。下标引用的括号写出了，变成了函数调用的圆括号了()
 
-def info_tuple2List(infoTuple): # 数据库查询返回的一条记录是元组，为了方便后续编程，设计此函数
-     return {'id':infoTuple[0],'name':infoTuple[1],'pwd':infoTuple[2],'host':infoTuple[3],'status':infoTuple[4]}
+def info_list2Dict(infoList): # 数据库查询返回的一条记录是元组，为了方便后续编程，设计此函数
+     return {'id':infoList[0],'name':infoList[1],'pwd':infoList[2],'host':infoList[3],'status':infoList[4]}
 
 def mainFrame(userinfo):
     print('welcome {} at {} , status: {}'.format(userinfo['name'],userinfo['host'],userinfo['status']))
@@ -113,42 +113,57 @@ def userDel(username,sock): # 一般这个模块是用户登录之后才出现�
             print('=========================================')
             return
     
-# def login(username,sock): # host没写
+def login(username,sock): # host没写
+    # 先发送状态码
+    sock.send(statusMark['login'].encode())
+    print('=========================================')
+    print('尊敬的{}, 欢迎使用RGchat！，请登录：'.format(username))
+    sock.send(username.encode()) # 将要登录d的username发送给服务器
 
-#     print('=========================================')
-#     print('尊敬的{}, 欢迎使用RGchat！，请登录：'.format(username))
-    
+    # dbCursor.execute('SELECT name FROM userdata')
+    # userNameTuple = [ t[0] for t in dbCursor.fetchall()] # 数据大了这里效率会非常低
+    userNameList = sock.recv(MAX_BYTES) # 拉取用户列表
+    userNameList = json.loads(userNameList.decode())
 
-#     dbCursor.execute('SELECT name FROM userdata')
-#     userNameTuple = [ t[0] for t in dbCursor.fetchall()] # 数据大了这里效率会非常低
-
-#     if username not in userNameTuple:
-#         print('账号{}不存在！请注册：'.format(username))
-#         login(register()) # 注册完了重新login
-#         # mainFrame(userinfo) 
-#     else:
-#         sql = 'SELECT pwd FROM userdata WHERE name= "{}" '.format(username)
-#         dbCursor.execute(sql)
-#         pwd = dbCursor.fetchone()[0]
-#         errPwdCount=0
-#         userPwd = getpass.getpass('Password: ')
-#         while(userPwd != pwd):
-#             errPwdCount+=1
-#             userinfo['pwd']=getpass.getpass('错误的密码，还可以尝试{}次：'.format(5-errPwdCount))
-#             if errPwdCount>4:
-#                 print('您已经输错5次密码，系统将自动退出！')
-#                 return 
-#         # 登录后将该用户状态设置为1表示在线
-#         sql = 'UPDATE userdata SET status={} WHERE name="{}" '.format(1,username) 
-#         dbCursor.execute(sql)
-#         mydb.commit()
-#         # 抽取用户信息，因为mainFrame需要获得用户所有信息
-#         sql = 'SELECT * FROM userdata WHERE name="{}" '.format(username)
-#         dbCursor.execute(sql)
-#         infoTuple = dbCursor.fetchone()
-#         userinfo = info_tuple2List(infoTuple) 
-#         print('=========================================')
-#         mainFrame(userinfo)
+    if username not in userNameList:
+        print('账号{}不存在！请注册：'.format(username))
+        userExistFlag = '0'
+        sock.send(userExistFlag.encode()) # 发送用户不存在标识
+        login(register(sock),sock) # 注册完了重新login
+        # mainFrame(userinfo) 
+    else:
+        # sql = 'SELECT pwd FROM userdata WHERE name= "{}" '.format(username)
+        # dbCursor.execute(sql)
+        # pwd = dbCursor.fetchone()[0]
+        userExistFlag = '1'
+        sock.send(userExistFlag.encode()) # 发送用户存在标识
+        pwd = sock.recv(MAX_BYTES).decode() # 获取密码，之后优化要加密
+        errPwdCount=0
+        userPwd = getpass.getpass('Password: ')
+        while(userPwd != pwd):
+            errPwdCount+=1
+            userpwd=getpass.getpass('错误的密码，还可以尝试{}次：'.format(5-errPwdCount))
+            if errPwdCount>3:
+                print('您已经输错5次密码，系统将自动退出！')
+                pwdFlag = '0'
+                sock.send(pwdFlag.encode()) # 发送密码检验标志符
+                return 
+        pwdFlag = '1'
+        sock.send(pwdFlag.encode()) # 发送密码检验标志符
+        # # 登录后将该用户状态设置为1表示在线
+        # sql = 'UPDATE userdata SET status={} WHERE name="{}" '.format(1,username) 
+        # dbCursor.execute(sql)
+        # mydb.commit()
+        # # 抽取用户信息，因为mainFrame需要获得用户所有信息
+        # sql = 'SELECT * FROM userdata WHERE name="{}" '.format(username)
+        # dbCursor.execute(sql)
+        # infoTuple = dbCursor.fetchone()
+        # userinfo = info_tuple2List(infoTuple) 
+        userinfo = sock.recv(MAX_BYTES).decode()
+        userinfo = json.loads(userinfo) # 得到的userinfo是list
+        userinfo = info_list2Dict(userinfo) # 转成字典，mainframe要用字典
+        print('=========================================')
+        mainFrame(userinfo)
 
 # def logout(username,sock): # 没写完，要等进入mainframe写完之后调用break
 #     # 注销后将该用户状态设置为0表示离线，同时清空host
@@ -174,7 +189,8 @@ def clientBoot(host,port):
     # 问候服务器
     greeting(sock)
     # register(sock)
-    userDel('jack',sock)
+    # userDel('jack',sock)
+    login('Lucy',sock)
     
 
 

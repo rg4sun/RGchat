@@ -33,8 +33,8 @@ def handleGreeting(sock,addr):
     print('Client:{} => {}'.format(addr,data.decode()))
     sock.sendto('> Conected to RGchat Server <'.encode(),addr)
 
-def info_tuple2List(infoTuple): # 数据库查询返回的一条记录是元组，为了方便后续编程，设计此函数
-     return {'id':infoTuple[0],'name':infoTuple[1],'pwd':infoTuple[2],'host':infoTuple[3],'status':infoTuple[4]}
+# def info_tuple2List(infoTuple): # 数据库查询返回的一条记录是元组，为了方便后续编程，设计此函数
+#      return {'id':infoTuple[0],'name':infoTuple[1],'pwd':infoTuple[2],'host':infoTuple[3],'status':infoTuple[4]}
 
 def mainFrame(userinfo):
     print('welcome {} at {} , status: {}'.format(userinfo['name'],userinfo['host'],userinfo['status']))
@@ -49,31 +49,14 @@ def handleRegister(sock,addr):
     userNameTuple = json.dumps(userNameTuple) # 由于服务器只能传送str, 将查询得到的tuple用json转成字符串
     # dumps会把list、tuple类型转成json的array，array用loads会恢复成list
     sock.sendto(userNameTuple.encode(),addr)
-
-    # while(1): # 判断用户名是否被注册过，更好的办法是设计数据库的时候name字段不能重，以后再优化了
-    #     username = input('Username: ')
-    #     if username in userNameTuple:
-    #         print('用户名已被注册，请尝试更换！')
-    #     else:
-    #         break
-    # userPwd = getpass.getpass('Password: ')
-    # pwdCheck = getpass.getpass("Password Check: ")
-    # while(userPwd != pwdCheck): # 密码验证
-    #     print('Check不通过，两次输入的密码不一致，请重新设置密码！')
-    #     userPwd = getpass.getpass('Password: ')
-    #     pwdCheck = getpass.getpass("Password Check: ")
-
-
     # 新人入库
     insertData, addr = sock.recvfrom(MAX_BYTES)
-    print(insertData)
     sql = 'INSERT INTO userdata (name,pwd) VALUES (%s,%s)' # id自增，stauts、host设置了默认初始值0、NULL
     insertData = tuple(json.loads(insertData.decode())) # 要转成tuple
     dbCursor.execute(sql,insertData) # 执行sql语句
     mydb.commit() # 数据表内容有更新，必须使用到该语句
     # 不知道commit有没有更新成功的返回值，有的话可以写一个regFlag
     sock.sendto('1'.encode(),addr)
-
     # print('注册成功！')
     # print('=========================================')
     # return username
@@ -83,7 +66,7 @@ def handleUserDel(sock,addr): # 一般这个模块是用户登录之后才出现
     # print('敏感操作：正在删除账户 {} ...'.format(username))
     # username = sock.recvfrom(MAX_BYTES)# 从客户端接收要删除的username, 要时刻注意recvform返回的是 data-str，addr-tuple
     # username = username.decode
-    username = sock.recv(MAX_BYTES).decode()
+    username = sock.recv(MAX_BYTES).decode() # 获取要删的username
     # 拉取对应于该user的pwd
     sql = 'SELECT pwd FROM userdata WHERE name="{}" '.format(username)
     dbCursor.execute(sql)
@@ -92,7 +75,7 @@ def handleUserDel(sock,addr): # 一般这个模块是用户登录之后才出现
     sock.sendto(pwd.encode(),addr) # 将密码发送给客户端用于验证，后续优化这里要加密
     # pwdFlag = sock.recvfrom(MAX_BYTES) #  要时刻注意recvform返回的是 data-str，addr-tuple
     # pwdFlag = pwdFlag.decode()
-    pwdFlag = sock.recv(MAX_BYTES).decode()
+    pwdFlag = sock.recv(MAX_BYTES).decode() # 接收密码检验标识
     if pwdFlag == '0':
         return
     elif pwdFlag == '1':
@@ -102,42 +85,40 @@ def handleUserDel(sock,addr): # 一般这个模块是用户登录之后才出现
         return
 
     
-def login(username,sock): # host没写
-
-    print('=========================================')
-    print('尊敬的{}, 欢迎使用RGchat！，请登录：'.format(username))
+def handleLogin(sock,addr): # host没写
     
-
+    username = sock.recv(MAX_BYTES).decode() # 获取要登录的username
+    # 拉取用户列表
     dbCursor.execute('SELECT name FROM userdata')
     userNameTuple = [ t[0] for t in dbCursor.fetchall()] # 数据大了这里效率会非常低
+    userNameTuple = json.dumps(userNameTuple)
+    sock.sendto(userNameTuple.encode(), addr) # 发送用户列表
 
-    if username not in userNameTuple:
-        print('账号{}不存在！请注册：'.format(username))
-        login(register()) # 注册完了重新login
-        # mainFrame(userinfo) 
-    else:
+    userExistFlag = sock.recv(MAX_BYTES).decode() # 接收用户存在标识
+    if userExistFlag == '0':
+        return # return出去直接就是break，进入下个状态码接收
+    elif userExistFlag == '1':
+        # 拉取对应密码
         sql = 'SELECT pwd FROM userdata WHERE name= "{}" '.format(username)
         dbCursor.execute(sql)
         pwd = dbCursor.fetchone()[0]
-        errPwdCount=0
-        userPwd = getpass.getpass('Password: ')
-        while(userPwd != pwd):
-            errPwdCount+=1
-            userinfo['pwd']=getpass.getpass('错误的密码，还可以尝试{}次：'.format(5-errPwdCount))
-            if errPwdCount>4:
-                print('您已经输错5次密码，系统将自动退出！')
-                return 
-        # 登录后将该用户状态设置为1表示在线
-        sql = 'UPDATE userdata SET status={} WHERE name="{}" '.format(1,username) 
-        dbCursor.execute(sql)
-        mydb.commit()
-        # 抽取用户信息，因为mainFrame需要获得用户所有信息
-        sql = 'SELECT * FROM userdata WHERE name="{}" '.format(username)
-        dbCursor.execute(sql)
-        infoTuple = dbCursor.fetchone()
-        userinfo = info_tuple2List(infoTuple) 
-        print('=========================================')
-        mainFrame(userinfo)
+        sock.sendto(pwd.encode(),addr) # 发送密码，用户客户端验证
+        pwdFlag = sock.recv(MAX_BYTES).decode() # 接收密码正确标识
+        if pwdFlag == '0':
+            return
+        elif pwdFlag == '1':
+            # 登录后将该用户状态设置为1表示在线
+            sql = 'UPDATE userdata SET status={} WHERE name="{}" '.format(1,username) 
+            dbCursor.execute(sql)
+            mydb.commit()
+            # 抽取用户信息，因为mainFrame需要获得用户所有信息
+            sql = 'SELECT * FROM userdata WHERE name="{}" '.format(username)
+            dbCursor.execute(sql)
+            userinfo = dbCursor.fetchone()
+            # userinfo = info_tuple2List(infoTuple) # 弃用这个了，因为传送的时候用json格式不用考虑list和tuple的区别了
+            userinfo = json.dumps(userinfo)
+            sock.sendto(userinfo.encode(),addr) # 发送更新状态的用户信息
+            return
 
 def logout(username,sock): # 没写完，要等进入mainframe写完之后调用break
     # 注销后将该用户状态设置为0表示离线，同时清空host
@@ -168,27 +149,28 @@ def serverBoot(interface,port):
             # break # 测试用
             continue
         elif status.decode() == statusMark['login']:
-            pass
-            # handleLogin(sock,addr)
+            handleLogin(sock,addr)
+            # break # 测试用
+            continue
         elif status.decode() == statusMark['register']:
             handleRegister(sock,addr)
             # break # 测试用
             continue
         elif status.decode() == statusMark['userDel']:
             handleUserDel(sock,addr)
-            break # 测试用
-            # continue
+            # break # 测试用
+            continue
         
     
 
         
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='UDP based RGchat') # 创建ArgumentParser 对象
-    parser.add_argument('host', metavar='HOST', type=str, default='127.0.0.1', help='interface the server listens at(default 127.0.0.1)')
-    parser.add_argument('-p',metavar='PORT',type=int,default=1060,help='UDP server port(default 1060)')
-    args = parser.parse_args()
-    serverBoot(args.host,args.p)
-    # serverBoot('127.0.0.1',1060)
+    # parser = argparse.ArgumentParser(description='UDP based RGchat') # 创建ArgumentParser 对象
+    # parser.add_argument('host', metavar='HOST', type=str, default='127.0.0.1', help='interface the server listens at(default 127.0.0.1)')
+    # parser.add_argument('-p',metavar='PORT',type=int,default=1060,help='UDP server port(default 1060)')
+    # args = parser.parse_args()
+    # serverBoot(args.host,args.p)
+    serverBoot('127.0.0.1',1060)
     # print(sys.argv[2])
     
